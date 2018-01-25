@@ -1,11 +1,12 @@
-var express = require('express');
-var app = express();
+const express = require('express');
+const app = express();
 app.set("view engine", "ejs");
+const cookieParser = require('cookie-parser')
+app.use(cookieParser());
 const bodyParser = require("body-parser");
 app.use(bodyParser.urlencoded({extended: true}));
-var crypto = require('crypto');
-var PORT = process.env.PORT || 8080 //default port 8080 
-
+const crypto = require('crypto');
+const PORT = process.env.PORT || 8080 //default port 8080 
 
 
 let urlDatabase = [
@@ -14,6 +15,9 @@ let urlDatabase = [
     {longURL: 'http://www.twitter.com', shortURL: '29ru23'}
 ];
 
+let userDB = []
+
+//GET FUNCTIONS BEGIN HERE
 app.get("/", (req, res) => {
     res.redirect("/urls");
 });
@@ -23,20 +27,61 @@ function generateRandomString() {
     return urlHash
 }
 
+//Shows the index page coding
 app.get("/urls", (req, res) => {
-    let templateVars = { urls: urlDatabase };
+    let templateVars = { urls: urlDatabase, username: req.cookies["username"], };
     res.render("urls_index", templateVars);
 });
 
+//Visitor hits or is redirected to the urls/new page
 app.get("/urls/new", (req, res) => {
-    res.render("urls_new");
+    let templateVars = {username: req.cookies["username"]}
+    res.render("urls_new", templateVars);
  });
 
+//Change which long URL is appended to the shortURL
 app.get("/urls/:id", (req, res) => {
     let templateVars = { shortURL: req.params.id, longURL: urlDatabase.longURL };
     res.render("urls_show", templateVars);
 });
 
+//Login function
+app.get("/login", (req, res) => {
+    let templateVars = { login: req.body.id, username: req.cookies["username"] };
+    req.cookies.forEach(function(user) {
+        if (userDB.user === req.cookies["username"]) {
+            console.log(`${user} is already logged in!`);
+        } else {
+            console.log(`${userDB.user} just logged in`)
+        }
+    });
+    res.render("urls_index", templateVars);
+});
+
+//POST FUNCTIONS BEGIN HERE
+
+app.post("/urls", (req, res) => {
+    console.log(req.body);  
+    var newURL = generateRandomString();
+    urlDatabase.push({longURL: req.body.longURL, shortURL: newURL})
+    res.redirect("/urls");    
+ });
+
+ //Post username
+  app.post("/login", (req, res) => {
+    let loginID = req.body.username.toLowerCase();
+    userDB.forEach(function(user) {
+         if (user === loginID) {
+        console.log(`${user} is already logged in.`)
+        } else {
+        console.log(`${loginID} has logged in!`);  
+        userDB.push(loginID)
+        res.cookie('username', `${loginID}`)
+        console.log(userDB, `${req.cookies["username"]} checked in`);
+        }
+    });
+    res.redirect("/urls");    
+ });
 app.post("/urls/:id", (req, res) => {
     console.log(req.body);  
     for (links of urlDatabase) {
@@ -77,10 +122,6 @@ app.get("/u/:smol", (req, res) => {
        }
    });
   });
-
-app.get("/hello", (req, res) => {
-    res.end("<html><body>Hello <b>World</b></body></html>\n");
-});
 
 app.listen(PORT, () => {
     console.log(`Example app listening on port ${PORT}!`);
