@@ -1,10 +1,9 @@
-<nav class="navbar navbar-default" role="navigation">
-    <div class="container-fluid">
-    <div class="navbar-header">
-    <form method="POST" action="/login">
-    <input id="username" type="text" name="username" placeholder="Enter your username" style="width: 300px">    
-    <input type="submit" value="Submit">
+<% if(username) { %>
+    <div>Username: <%= username %></div>
+    <form action="/logout" method="POST">
+        <input type="submit" value="Logout">
     </form>
-    </div>
-    </div>
-</nav>
+<% } else { %>
+    <a href="/register">Register</a>
+    <a href="/login">Login</a>
+<% } %>
