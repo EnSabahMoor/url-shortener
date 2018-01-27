@@ -172,9 +172,10 @@ app.post("/login", (req, res) => {
     res.redirect("/urls"); 
  });
 
-
-
-
+app.post ("/logout", (req, res) => {
+    res.clearCookie("user_id");
+    res.redirect("/urls");
+})
 
 
 //LISTEN ROUTE: Server listens on port 8080
