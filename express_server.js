@@ -9,19 +9,39 @@ const crypto = require('crypto');
 const PORT = process.env.PORT || 8080 //default port 8080 
 
 
-let urlDatabase = [
+const urlDatabase = [
     {longURL:'http://www.lighthouselabs.ca', shortURL:'b2xVn2'},
     {longURL: 'http://www.google.com', shortURL: '9sm5xK'},
     {longURL: 'http://www.twitter.com', shortURL: '29ru23'}
 ];
 
-let userDB = {
+const userDB = {
     "aji398" : {id: "aji398", email: 'bob@bob.com', password: 'test1234'}
+}
+
+// userDB["aji398"]["email"]
+// userDB.aji398.email
+
+function findUser(user_id) {
+    let foundUser = null;
+        foundUser = userDB[user_id];
+    if (foundUser == null) {
+        console.log("No user entered")
+    }
+    else{
+        return foundUser;
+    }
 }
 
 //GET FUNCTIONS BEGIN HERE
 app.get("/", (req, res) => {
+    if (req.cookies['user_id']) {
+        let user = findUser(req.cookies["user_id"])
+        let templateVars = { urls: urlDatabase, user: user}
+        res.render("urls_index", templateVars)
+    } else {
     res.redirect("/urls");
+    }
 });
 
 function generateRandomString() {
@@ -29,14 +49,15 @@ function generateRandomString() {
     return urlHash
 }
 
-function fetchUsername(req) {
-    return req.cookies['userId'] ? userDB[req.cookies['userId']].email : ""
-}
 //URLs ROUTE: Shows the index page coding
 app.get("/urls", (req, res) => {
-    let username = fetchUsername(req)
-    let templateVars = { urls: urlDatabase, username: username };
-    res.render("urls_index", templateVars);
+    if (req.cookies['user_id']) {
+        let user = findUser(req.cookies["user_id"])
+        let templateVars = { urls: urlDatabase, user: user };
+        res.render("urls_index", templateVars);
+    } else {
+        res.redirect("/register")
+    }
 });
 
 app.post("/urls", (req, res) => {
@@ -48,7 +69,8 @@ app.post("/urls", (req, res) => {
 
 //URLs NEW ROUTE: Visitor hits or is redirected to the urls/new page
 app.get("/urls/new", (req, res) => {
-    let templateVars = {username: req.cookies["username"]}
+    let foundUser = findUser(req.cookies["user_id"]);
+    let templateVars = {user: foundUser}
     res.render("urls_new", templateVars);
  });
 
@@ -63,7 +85,8 @@ app.get("/urls/new", (req, res) => {
 
 //ID ROUTE: Change which long URL is appended to the shortURL
 app.get("/urls/:id", (req, res) => {
-    let templateVars = { shortURL: req.params.id, longURL: urlDatabase.longURL };
+           foundUser = findUser(req.cookies["user_id"]); 
+    let templateVars = { user: foundUser, shortURL: req.params.id, longURL: urlDatabase.longURL };
     res.render("urls_show", templateVars);
 });
 
@@ -96,18 +119,18 @@ app.post("/urls/:id", (req, res) => {
 
 //REGISTER ROUTE: User can register on the site
 app.get('/register', (req, res) => {
-    let username = fetchUsername(req)
-    if (username) {
+    let user = findUser(req)
+    if (user) {
         res.redirect("/urls")
     } else {
-        let templateVars = {username: username}
+        let templateVars = {user: user}
         res.render("urls_register", templateVars)
     } 
 })
 
 app.post('/register', (req, res) => {
-    for(let userId in userDB) {
-        if(userDB[userId].email === req.body.email) {
+    for(let user_id in userDB) {
+        if(userDB[user_id].email === req.body.email) {
             res.send("Already registered")
             return
         }
@@ -118,35 +141,41 @@ app.post('/register', (req, res) => {
     } 
     let user = {id: generateRandomString(), email: req.body.email, password: req.body.password}
     userDB[user.id] = user
-    res.cookie("userId", user.id)
+    res.cookie("user_id", user.id)
+    console.log(`${req.body.email} has registered`)
     res.redirect("/urls"); 
 });
 
 //LOGIN ROUTE: User can login
 app.get("/login", (req, res) => {
-    let username = fetchUsername(req);
-    if (username) {
-        res.send("Already logged in!")
+    if (req.cookies["user_id"] && findUser(req)){
         res.redirect("/urls")
     } else {
-        res.render("/urls")
+    // let templateVars = {id: user_id}
+        res.render("urls_login")
     }
 });
 
-//   app.post("/login", (req, res) => {
-//     let loginID = req.body.username.toLowerCase();
-//     // userDB.forEach(function(user) {
-//     //      if (user === ) {
-//     //     console.log(`${user} is already logged in.`)
-//     //     } else {
-//     //     console.log(`${loginID} has logged in!`);  
-//         // userDB.push(loginID)
-//         res.cookie('username', loginID)
-//         console.log(userDB, `${req.cookies["username"]} checked in`);
-//         }
-//     });
-//     res.redirect("/urls");    
-//  });
+app.post("/login", (req, res) => {     
+    
+    for (let user in userDB) {
+
+        console.log(user)
+            console.log("password")
+        console.log(user.password)
+        console.log(req.body.email)
+       if (req.body.email == userDB[user].email && req.body.password == userDB[user].password) {
+            res.cookie("user_id", user)
+            console.log(`Thanks for logging in ${req.body.email}`)
+            res.redirect("/urls")
+            return
+       }
+   }  
+            res.status(400)
+            res.send("Nah,son.")
+        
+    res.redirect("/urls"); 
+ });
 
 
 
