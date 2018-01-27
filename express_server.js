@@ -159,11 +159,6 @@ app.get("/login", (req, res) => {
 app.post("/login", (req, res) => {     
     
     for (let user in userDB) {
-
-        console.log(user)
-            console.log("password")
-        console.log(user.password)
-        console.log(req.body.email)
        if (req.body.email == userDB[user].email && req.body.password == userDB[user].password) {
             res.cookie("user_id", user)
             console.log(`Thanks for logging in ${req.body.email}`)
