@@ -8,69 +8,77 @@ app.use(bodyParser.urlencoded({extended: true}));
 const crypto = require('crypto');
 const PORT = process.env.PORT || 8080 //default port 8080 
 
-let userDB = {
-    "aji398" : {id: "aji398", email: 'bob@bob.com', password: 'test1234'}
-}
+let userDB = [
+    {id: "aji398", email: 'bob@bob.com', password: 'test1234', urls: `www.netflix.com`}
+]
 
-let urlDatabase = [
-    {longURL:'http://www.lighthouselabs.ca', shortURL:'b2xVn2', },
-    {longURL: 'http://www.google.com', shortURL: '9sm5xK'},
-    {longURL: 'http://www.twitter.com', shortURL: '29ru23'}
-];
+let urlDatabase = [];
+let ownUrlDB = []
 
-// userDB["aji398"]["email"]
-// userDB.aji398.email
-
-function findUser(user_id) {
-    let foundUser = null;
-        foundUser = userDB[user_id];
-    if (foundUser == null) {
-        console.log("Unknown user navigating")
-    } else {
-        return foundUser;
+function keyedDB(links, user){
+    for (let key in links) {
+        if (links[key].userId === user) {
+          ownUrlDB.push(links[key]);
+        }
     }
+    return ownUrlDB
 }
-
-//GET FUNCTIONS BEGIN HERE
-app.get("/", (req, res) => {
-    if (req.cookies['user_id']) {
-        let user = findUser(req.cookies["user_id"])
-        let templateVars = { urls: urlDatabase, user: user}
-        res.render("urls_index", templateVars)
-    } else {
-    res.redirect("/urls");
-    }
-});
 
 function generateRandomString() {
     let urlHash = crypto.randomBytes(3).toString('hex');
     return urlHash
 }
 
+function findUser(user, DB) {
+    let foundUser = null
+    for (user in DB) {
+        if (user == DB[user].id) {
+            foundUser = user
+        } else {
+            console.log("can't find user")
+        }
+    }
+    return foundUser
+}
+
+//GET FUNCTIONS BEGIN HERE
+app.get("/", (req, res) => {
+    if (req.cookies['user_id']) {
+        let user = findUser(req.cookies["user_id"], userDB)
+        let templateVars = {urls: ownUrlDB, user: user}
+        res.render("urls_index", templateVars)
+    } else {
+    res.redirect("/urls");
+    }
+});
+
+
 //URLs ROUTE: Shows the index page coding
 app.get("/urls", (req, res) => {
     if (req.cookies['user_id']) {
-        let user = findUser(req.cookies["user_id"])
-        let templateVars = { urls: urlDatabase, user: user };
+        let user = findUser(req.cookies["user_id"], userDB);
+        let templateVars = { urls: ownUrlDB, user: user };
         res.render("urls_index", templateVars);
     } else {
         res.redirect("/register")
     }
 });
 
+//URLs ROUTE: Shortens the URL
 app.post("/urls", (req, res) => {
     console.log(req.body);  
-    var newURL = generateRandomString();
-    urlDatabase.push({longURL: req.body.longURL, shortURL: newURL, userId: req.cookies["user_id"]});
+    let smolURL = generateRandomString();
+    urlDatabase.push({longURL: req.body.longURL, shortURL: smolURL, userId: req.cookies["user_id"]});
+    keyedDB(urlDatabase, req.cookies["user_id"]);
     res.redirect("/urls");    
  });
 
 //URLs NEW ROUTE: Visitor hits or is redirected to the urls/new page
 app.get("/urls/new", (req, res) => {
     if (req.cookies["user_id"]){
-    let user = findUser(req.cookies["user_id"])
-    let templateVars = {urls: urlDatabase, userId: req.cookies["user_id"], user: user}
-    console.log(urlDatabase)
+    let user = findUser(req.cookies["user_id"], userDB)
+    let templateVars = {urls: ownUrlDB, userId: req.cookies["user_id"], user: user}
+    console.log(ownUrlDB)
     res.render("urls_new", templateVars)
     } else {
     res.redirect("/login");
@@ -86,16 +94,20 @@ app.get("/urls/new", (req, res) => {
     });
    });
 
-//ID ROUTE: Change which long URL is appended to the shortURL
+//EDIT ROUTE: Change which long URL is appended to the shortURL
 app.get("/urls/:id", (req, res) => {
-           foundUser = findUser(req.cookies["user_id"]); 
-    let templateVars = { user: foundUser, shortURL: req.params.id, longURL: urlDatabase.longURL };
+    if (req.cookies['user_id'] === urlDatabase[userId]) {
+    let foundUser = findUser(req.cookies["user_id"], userDB); 
+    let templateVars = { user: foundUser, shortURL: req.params.id, longURL: ownUrlDB.longURL };
     res.render("urls_show", templateVars);
+    } else {
+        res.redirect("urls_new");
+    }
 });
 
 app.post("/urls/:id", (req, res) => {
     console.log(req.body);  
-    for (links of urlDatabase) {
+    for (links of ownUrlDB) {
         if (links.shortURL === req.params.id) {
             links.longURL = req.body.longURL
             break;
@@ -110,7 +122,7 @@ app.post("/urls/:id", (req, res) => {
     console.log(req.params.id); 
     let site = req.params.id
     let newDB = []
-    for (links of urlDatabase) {
+    for (links of ownUrlDB) {
         if (links.shortURL !== site) {
             newDB.push(links)
         }
@@ -123,11 +135,11 @@ app.post("/urls/:id", (req, res) => {
 
 //REGISTER ROUTE: User can register on the site
 app.get('/register', (req, res) => {
-    let user = findUser(req)
-    if (user) {
+    if (req.cookies["user_id"]) {
+    let user = findUser(req.cookies["user_id"], userDB)
         res.redirect("/urls")
     } else {
-        let templateVars = {user: user}
+        let templateVars = {user: null}
         res.render("urls_register", templateVars)
     } 
 });
@@ -143,9 +155,9 @@ app.post('/register', (req, res) => {
         res.status(400)
         res.send("Nah,son.")
     } 
-    let user = {id: generateRandomString(), email: req.body.email, password: req.body.password}
-    userDB[user.id] = user
-    res.cookie("user_id", user.id)
+    let newId = generateRandomString()
+    userDB.push({id: newId, email: req.body.email, password: req.body.password});
+    res.cookie("user_id", newId)
     console.log(`${req.body.email} has registered`)
     console.log(userDB)
     res.redirect("/urls"); 
@@ -153,7 +165,7 @@ app.post('/register', (req, res) => {
 
 //LOGIN ROUTE: User can login
 app.get("/login", (req, res) => {
-    let user = findUser(req)
+    let user = findUser(req, userDB)
     if (req.cookies["user_id"] && findUser(req)){
         res.redirect("/urls")
     } else {
