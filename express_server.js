@@ -8,16 +8,15 @@ app.use(bodyParser.urlencoded({extended: true}));
 const crypto = require('crypto');
 const PORT = process.env.PORT || 8080 //default port 8080 
 
+let userDB = {
+    "aji398" : {id: "aji398", email: 'bob@bob.com', password: 'test1234'}
+}
 
-const urlDatabase = [
-    {longURL:'http://www.lighthouselabs.ca', shortURL:'b2xVn2'},
+let urlDatabase = [
+    {longURL:'http://www.lighthouselabs.ca', shortURL:'b2xVn2', },
     {longURL: 'http://www.google.com', shortURL: '9sm5xK'},
     {longURL: 'http://www.twitter.com', shortURL: '29ru23'}
 ];
-
-const userDB = {
-    "aji398" : {id: "aji398", email: 'bob@bob.com', password: 'test1234'}
-}
 
 // userDB["aji398"]["email"]
 // userDB.aji398.email
@@ -26,9 +25,8 @@ function findUser(user_id) {
     let foundUser = null;
         foundUser = userDB[user_id];
     if (foundUser == null) {
-        console.log("No user entered")
-    }
-    else{
+        console.log("Unknown user navigating")
+    } else {
         return foundUser;
     }
 }
@@ -63,15 +61,20 @@ app.get("/urls", (req, res) => {
 app.post("/urls", (req, res) => {
     console.log(req.body);  
     var newURL = generateRandomString();
-    urlDatabase.push({longURL: req.body.longURL, shortURL: newURL})
+    urlDatabase.push({longURL: req.body.longURL, shortURL: newURL, userId: req.cookies["user_id"]});
     res.redirect("/urls");    
  });
 
 //URLs NEW ROUTE: Visitor hits or is redirected to the urls/new page
 app.get("/urls/new", (req, res) => {
-    let foundUser = findUser(req.cookies["user_id"]);
-    let templateVars = {user: foundUser}
-    res.render("urls_new", templateVars);
+    if (req.cookies["user_id"]){
+    let user = findUser(req.cookies["user_id"])
+    let templateVars = {urls: urlDatabase, userId: req.cookies["user_id"], user: user}
+    console.log(urlDatabase)
+    res.render("urls_new", templateVars)
+    } else {
+    res.redirect("/login");
+    }
  });
 
 //REDIRECT ROUTE: Visitor enters /u/Short-URL and is redirected to the desired site
@@ -114,6 +117,7 @@ app.post("/urls/:id", (req, res) => {
     }
     urlDatabase = newDB
     console.log(`${site} has been removed!`)
+    console.log(urlDatabase)
     res.redirect("/urls");
 });
 
@@ -126,7 +130,7 @@ app.get('/register', (req, res) => {
         let templateVars = {user: user}
         res.render("urls_register", templateVars)
     } 
-})
+});
 
 app.post('/register', (req, res) => {
     for(let user_id in userDB) {
@@ -143,16 +147,18 @@ app.post('/register', (req, res) => {
     userDB[user.id] = user
     res.cookie("user_id", user.id)
     console.log(`${req.body.email} has registered`)
+    console.log(userDB)
     res.redirect("/urls"); 
 });
 
 //LOGIN ROUTE: User can login
 app.get("/login", (req, res) => {
+    let user = findUser(req)
     if (req.cookies["user_id"] && findUser(req)){
         res.redirect("/urls")
     } else {
-    // let templateVars = {id: user_id}
-        res.render("urls_login")
+    let templateVars = {user: user}
+        res.render("urls_login", templateVars)
     }
 });
 
@@ -167,7 +173,7 @@ app.post("/login", (req, res) => {
        }
    }  
             res.status(400)
-            res.send("Nah,son.")
+            res.redirect("/login")
         
     res.redirect("/urls"); 
  });
