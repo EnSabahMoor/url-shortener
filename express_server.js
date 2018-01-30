@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser')
 app.use(cookieParser());
 const bodyParser = require("body-parser");
 app.use(bodyParser.urlencoded({extended: true}));
+const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const PORT = process.env.PORT || 8080 //default port 8080 
 
@@ -167,7 +168,9 @@ app.post('/register', (req, res) => {
         res.send("Nah,son.")
     } 
     let newId = generateRandomString()
-    userDB.push({id: newId, email: req.body.email, password: req.body.password});
+    const password = req.body.password
+    const hashedPassword = bcrypt.hashSync(password, 10);
+    userDB.push({id: newId, email: req.body.email, password: hashedPassword});
     res.cookie("user_id", newId)
     console.log(`${req.body.email} has registered`)
     console.log(userDB)
@@ -186,12 +189,11 @@ app.get("/login", (req, res) => {
 });
 
 app.post("/login", (req, res) => {     
-    
     for (let user of userDB) {
-       if (req.body.email == user.email && req.body.password == user.password) {
-            res.cookie("user_id", user.id)
-            console.log(`Thanks for logging in ${req.body.email}`)
-            res.redirect("/urls")
+       if (req.body.email == user.email && bcrypt.compareSync(req.body.password, user.password)) {
+            res.cookie("user_id", user.id);
+            console.log(`Thanks for logging in ${req.body.email}`);
+            res.redirect("/urls");
             return
        }
    }  
