@@ -1,8 +1,12 @@
 const express = require('express');
 const app = express();
 app.set("view engine", "ejs");
-const cookieParser = require('cookie-parser')
-app.use(cookieParser());
+const cookieSession = require('cookie-session')
+app.use(cookieSession({
+  name: 'session',
+  keys: ['sessionkey'],
+  maxAge: 24 * 60 * 60 * 1000 // 24 hours
+}))
 const bodyParser = require("body-parser");
 app.use(bodyParser.urlencoded({extended: true}));
 const bcrypt = require('bcrypt');
@@ -23,13 +27,11 @@ function generateRandomString() {
 function findUser(user_id, DB) {
     let foundUser = null
     for (user of DB) {
-        console.log(user);
         if (user_id === user.id) {
             foundUser = user
         return foundUser
         } 
     }
-    console.log("can't find user")
     return foundUser
 }
 
@@ -41,14 +43,13 @@ function getUrl(shortUrl) {
             return gotUrl
         }
     }
-    console.log("Invalid URL entered")
     return gotUrl
 }
 
 //GET FUNCTIONS BEGIN HERE
 app.get("/", (req, res) => {
-    if (req.cookies['user_id']) {
-        let user = findUser(req.cookies["user_id"], userDB)
+    if (req.session['user_id']) {
+        let user = findUser(req.session["user_id"], userDB)
         let templateVars = {urls: urlDatabase, user: user}
         res.render("urls_index", templateVars)
     } else {
@@ -59,8 +60,8 @@ app.get("/", (req, res) => {
 
 //URLs ROUTE: Shows the index page coding
 app.get("/urls", (req, res) => {
-    if (req.cookies['user_id']) {
-        let user = findUser(req.cookies["user_id"], userDB);
+    if (req.session['user_id']) {
+        let user = findUser(req.session["user_id"], userDB);
         let userUrls = []
         for (link of urlDatabase) {
             if (user.id === link.userId) {
@@ -75,19 +76,17 @@ app.get("/urls", (req, res) => {
 });
 
 //URLs ROUTE: Shortens the URL
-app.post("/urls", (req, res) => {
-    console.log(req.body);  
+app.post("/urls", (req, res) => { 
     let smolURL = generateRandomString();
-    urlDatabase.push({longURL: req.body.longURL, shortURL: smolURL, userId: req.cookies["user_id"]});
+    urlDatabase.push({longURL: req.body.longURL, shortURL: smolURL, userId: req.session["user_id"]});
     res.redirect("/urls");    
  });
 
 //URLs NEW ROUTE: Visitor hits or is redirected to the urls/new page
 app.get("/urls/new", (req, res) => {
-    if (req.cookies["user_id"]){
-    let user = findUser(req.cookies["user_id"], userDB)
-    let templateVars = {urls: urlDatabase, userId: req.cookies["user_id"], user: user}
-    console.log(urlDatabase)
+    if (req.session["user_id"]){
+    let user = findUser(req.session["user_id"], userDB)
+    let templateVars = {urls: urlDatabase, userId: req.session["user_id"], user: user}
     res.render("urls_new", templateVars)
     } else {
     res.redirect("/login");
@@ -105,8 +104,7 @@ app.get("/urls/new", (req, res) => {
 
 //EDIT ROUTE: Change which long URL is appended to the shortURL
 app.get("/urls/:id", (req, res) => {
-    let foundUser = findUser(req.cookies["user_id"], userDB);
-    console.log(foundUser)
+    let foundUser = findUser(req.session["user_id"], userDB);
     let foundUrl = getUrl(req.params.id) 
     if (foundUser.id === foundUrl.userId) {
         let templateVars = { user: foundUser, shortURL: req.params.id, longURL: urlDatabase.longURL };
@@ -117,8 +115,7 @@ app.get("/urls/:id", (req, res) => {
     }
 });
 
-app.post("/urls/:id", (req, res) => {
-    console.log(req.body);  
+app.post("/urls/:id", (req, res) => { 
     for (links of urlDatabase) {
         if (links.shortURL === req.params.id) {
             links.longURL = req.body.longURL
@@ -130,8 +127,7 @@ app.post("/urls/:id", (req, res) => {
 
  //DELETE ROUTE: User can delete the short URL value
 
- app.post("/urls/:id/delete", (req, res) => {
-    console.log(req.params.id); 
+ app.post("/urls/:id/delete", (req, res) => { 
     let site = req.params.id
     let newDB = []
     for (links of urlDatabase) {
@@ -140,15 +136,13 @@ app.post("/urls/:id", (req, res) => {
         }
     }
     urlDatabase = newDB
-    console.log(`${site} has been removed!`)
-    console.log(urlDatabase)
     res.redirect("/urls");
 });
 
 //REGISTER ROUTE: User can register on the site
 app.get('/register', (req, res) => {
-    if (req.cookies["user_id"]) {
-    let user = findUser(req.cookies["user_id"], userDB)
+    if (req.session["user_id"]) {
+    let user = findUser(req.session["user_id"], userDB)
         res.redirect("/urls")
     } else {
         let templateVars = {user: null}
@@ -159,7 +153,7 @@ app.get('/register', (req, res) => {
 app.post('/register', (req, res) => {
     for(let user_id in userDB) {
         if(userDB[user_id].email === req.body.email) {
-            res.send("Already registered")
+            res.redirect("/login")
             return
         }
     }
@@ -171,15 +165,13 @@ app.post('/register', (req, res) => {
     const password = req.body.password
     const hashedPassword = bcrypt.hashSync(password, 10);
     userDB.push({id: newId, email: req.body.email, password: hashedPassword});
-    res.cookie("user_id", newId)
-    console.log(`${req.body.email} has registered`)
-    console.log(userDB)
+    req.session["user_id"] = newId
     res.redirect("/urls"); 
 });
 
 //LOGIN ROUTE: User can login
 app.get("/login", (req, res) => {
-    let user = findUser(req.cookies["user_id"], userDB)
+    let user = findUser(req.session["user_id"], userDB)
     if (user){
         res.redirect("/urls")
     } else {
@@ -191,8 +183,7 @@ app.get("/login", (req, res) => {
 app.post("/login", (req, res) => {     
     for (let user of userDB) {
        if (req.body.email == user.email && bcrypt.compareSync(req.body.password, user.password)) {
-            res.cookie("user_id", user.id);
-            console.log(`Thanks for logging in ${req.body.email}`);
+            req.session["user_id"] = user.id;
             res.redirect("/urls");
             return
        }
@@ -204,12 +195,12 @@ app.post("/login", (req, res) => {
  });
 
 app.post ("/logout", (req, res) => {
-    res.clearCookie("user_id");
+    req.session = null;
     res.redirect("/urls");
 })
 
 
 //LISTEN ROUTE: Server listens on port 8080
 app.listen(PORT, () => {
-    console.log(`Example app listening on port ${PORT}!`);
+    console.log(`TinyApp listening on port ${PORT}!`);
 });
