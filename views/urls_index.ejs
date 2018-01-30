@@ -4,8 +4,10 @@
   <title>TinyApp</title>
 </head>
 <body>
+  <% include partials/_header %>
    <ul>
-     <% urls.forEach(function(url) { %>
+     <% if (urls) { %>
+      <% urls.forEach(function(url) { %>
      <li>
        <%= url.longURL %> gets shortened to <%= url.shortURL %> 
        <a href="/urls/<%= url.shortURL %>">Edit</a>  <form method="POST" action="/urls/<%= url.shortURL %>/delete">
@@ -13,6 +15,7 @@
       
     </li>
      <% }); %>
+     <% } %>
    </ul>
 <p>Go <a href="/urls/new">here</a> to shorten your URL</p>
 </body>

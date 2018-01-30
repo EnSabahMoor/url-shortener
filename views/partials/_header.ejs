@@ -1,9 +1,9 @@
-<nav class="navbar navbar-default" role="navigation">
-        <div class="container-fluid">
-        
-            <div class="navbar-header">
-               
-            </div>
-        
-        </div>
-        </nav>
+<% if(user !== null) { %>
+    <div>user id: <%= user.id %></div>
+    <form action="/logout" method="POST">
+        <input type="submit" value="Logout">
+    </form>
+<% } else { %>
+    <a href="/register">Register</a>
+    <a href="/login">Login</a>
+<% } %>
