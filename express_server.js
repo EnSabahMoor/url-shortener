@@ -13,16 +13,6 @@ let userDB = [
 ]
 
 let urlDatabase = [];
-let ownUrlDB = []
-
-function keyedDB(links, user){
-    for (let key in links) {
-        if (links[key].userId === user) {
-          ownUrlDB.push(links[key]);
-        }
-    }
-    return ownUrlDB
-}
 
 function generateRandomString() {
     let urlHash = crypto.randomBytes(3).toString('hex');
@@ -42,11 +32,23 @@ function findUser(user_id, DB) {
     return foundUser
 }
 
+function getUrl(shortUrl) {
+    let gotUrl = null
+    for (link of urlDatabase) {
+        if (shortUrl === link.shortURL) {
+            gotUrl = link
+            return gotUrl
+        }
+    }
+    console.log("Invalid URL entered")
+    return gotUrl
+}
+
 //GET FUNCTIONS BEGIN HERE
 app.get("/", (req, res) => {
     if (req.cookies['user_id']) {
         let user = findUser(req.cookies["user_id"], userDB)
-        let templateVars = {urls: ownUrlDB, user: user}
+        let templateVars = {urls: urlDatabase, user: user}
         res.render("urls_index", templateVars)
     } else {
     res.redirect("/urls");
@@ -58,8 +60,13 @@ app.get("/", (req, res) => {
 app.get("/urls", (req, res) => {
     if (req.cookies['user_id']) {
         let user = findUser(req.cookies["user_id"], userDB);
-        console.log(user)
-        let templateVars = { urls: ownUrlDB, user: user };
+        let userUrls = []
+        for (link of urlDatabase) {
+            if (user.id === link.userId) {
+                userUrls.push(link);
+            }
+        }
+        let templateVars = { urls: userUrls, user: user };
         res.render("urls_index", templateVars);
     } else {
         res.redirect("/register")
@@ -71,7 +78,6 @@ app.post("/urls", (req, res) => {
     console.log(req.body);  
     let smolURL = generateRandomString();
     urlDatabase.push({longURL: req.body.longURL, shortURL: smolURL, userId: req.cookies["user_id"]});
-    keyedDB(urlDatabase, req.cookies["user_id"]);
     res.redirect("/urls");    
  });
 
@@ -79,8 +85,8 @@ app.post("/urls", (req, res) => {
 app.get("/urls/new", (req, res) => {
     if (req.cookies["user_id"]){
     let user = findUser(req.cookies["user_id"], userDB)
-    let templateVars = {urls: ownUrlDB, userId: req.cookies["user_id"], user: user}
-    console.log(ownUrlDB)
+    let templateVars = {urls: urlDatabase, userId: req.cookies["user_id"], user: user}
+    console.log(urlDatabase)
     res.render("urls_new", templateVars)
     } else {
     res.redirect("/login");
@@ -98,18 +104,21 @@ app.get("/urls/new", (req, res) => {
 
 //EDIT ROUTE: Change which long URL is appended to the shortURL
 app.get("/urls/:id", (req, res) => {
-    if (req.cookies['user_id'] === urlDatabase[userId]) {
-    let foundUser = findUser(req.cookies["user_id"], userDB); 
-    let templateVars = { user: foundUser, shortURL: req.params.id, longURL: ownUrlDB.longURL };
-    res.render("urls_show", templateVars);
+    let foundUser = findUser(req.cookies["user_id"], userDB);
+    console.log(foundUser)
+    let foundUrl = getUrl(req.params.id) 
+    if (foundUser.id === foundUrl.userId) {
+        let templateVars = { user: foundUser, shortURL: req.params.id, longURL: urlDatabase.longURL };
+        res.render("urls_show", templateVars);
     } else {
-        res.redirect("urls_new");
+        res.status(401);
+        res.send("You are not authorized to edit this code")
     }
 });
 
 app.post("/urls/:id", (req, res) => {
     console.log(req.body);  
-    for (links of ownUrlDB) {
+    for (links of urlDatabase) {
         if (links.shortURL === req.params.id) {
             links.longURL = req.body.longURL
             break;
@@ -124,7 +133,7 @@ app.post("/urls/:id", (req, res) => {
     console.log(req.params.id); 
     let site = req.params.id
     let newDB = []
-    for (links of ownUrlDB) {
+    for (links of urlDatabase) {
         if (links.shortURL !== site) {
             newDB.push(links)
         }
