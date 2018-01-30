@@ -29,15 +29,16 @@ function generateRandomString() {
     return urlHash
 }
 
-function findUser(user, DB) {
+function findUser(user_id, DB) {
     let foundUser = null
-    for (user in DB) {
-        if (user == DB[user].id) {
+    for (user of DB) {
+        console.log(user);
+        if (user_id === user.id) {
             foundUser = user
-        } else {
-            console.log("can't find user")
-        }
+        return foundUser
+        } 
     }
+    console.log("can't find user")
     return foundUser
 }
 
@@ -57,6 +58,7 @@ app.get("/", (req, res) => {
 app.get("/urls", (req, res) => {
     if (req.cookies['user_id']) {
         let user = findUser(req.cookies["user_id"], userDB);
+        console.log(user)
         let templateVars = { urls: ownUrlDB, user: user };
         res.render("urls_index", templateVars);
     } else {
@@ -165,20 +167,20 @@ app.post('/register', (req, res) => {
 
 //LOGIN ROUTE: User can login
 app.get("/login", (req, res) => {
-    let user = findUser(req, userDB)
-    if (req.cookies["user_id"] && findUser(req)){
+    let user = findUser(req.cookies["user_id"], userDB)
+    if (user){
         res.redirect("/urls")
     } else {
-    let templateVars = {user: user}
+        let templateVars = {user: user}
         res.render("urls_login", templateVars)
     }
 });
 
 app.post("/login", (req, res) => {     
     
-    for (let user in userDB) {
-       if (req.body.email == userDB[user].email && req.body.password == userDB[user].password) {
-            res.cookie("user_id", user)
+    for (let user of userDB) {
+       if (req.body.email == user.email && req.body.password == user.password) {
+            res.cookie("user_id", user.id)
             console.log(`Thanks for logging in ${req.body.email}`)
             res.redirect("/urls")
             return
